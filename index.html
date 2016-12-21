@@ -1,0 +1,195 @@
+<html>
+<head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.5.5/p5.js"></script>
+</head>
+<body>
+
+
+<script>
+    function Bullet(x, y) {
+        this.x = x;
+        this.y = y;
+        this.size = 25;
+        this.speed = 50;
+        this.power = 5;
+
+        this.draw = function() {
+            ellipse(this.x, this.y -= this.speed, this.size);
+        };
+
+        this.hit = function(monster) {
+            return ! monster.die && dist(this.x, this.y, monster.x, monster.y) <= this.size + monster.size / 2;
+        }
+    }
+
+    function Player() {
+        this.size = 60;
+        this.bullets = [];
+        this.x = mouseX;
+        this.y = height - this.size;
+
+        this.draw = function() {
+            this.x = mouseX;
+            this.y = height - this.size;
+
+            fill(255);
+            // Player
+            ellipse(this.x, this.y, this.size, this.size);
+
+            // Bullet
+            for (var i = this.bullets.length - 1; i > 0; i--) {
+                this.bullets[i].draw();
+                if (this.bullets[i].y < 0) this.bullets.splice(i, 1);
+            }
+        };
+
+        this.shoot = function() {
+            this.bullets.push(new Bullet(mouseX, height - this.size - 20));
+        };
+
+        this.hit = function(monster) {
+            return ! monster.die && dist(this.x, this.y, monster.x, monster.y) <= this.size;
+        };
+    }
+
+    function Monster(life, space, size, pos) {
+        this.speed = 2;
+        this.space = space;
+        this.size = size;
+        this.pos = pos;
+        this.y = -30;
+        this.x = (this.pos * this.space) + (this.space / 2);
+        this.life = life + random(life);
+        this.maxLife = this.life;
+        this.die = false;
+
+        this.draw = function() {
+            this.y += this.speed;
+
+            if (this.die) return;
+
+            // monster
+            ellipse(this.x, this.y, this.size, this.size);
+
+            // life
+            var xLife = this.pos * this.space + 10;
+            var yLife = this.y + (this.space / 2) - 10;
+            var width = (this.space - 20) * (this.life / this.maxLife);
+
+            rect(xLife, yLife, width, 10);
+        };
+
+        this.hit = function(bullet) {
+            this.life -= bullet.power;
+            if (this.life <= 0) {
+                this.die = true;
+            }
+        }
+    }
+
+    function Wave(difficulty) {
+        this.monsters = [];
+
+        this.space = floor(width / 6);
+        this.size = floor(this.space * 0.7);
+
+        for (var i = 0; i < floor(width / this.space); i++) {
+            this.monsters.push(new Monster(100 * (difficulty + 1), this.space, this.size, i));
+        }
+
+        this.draw = function() {
+            for (var i = this.monsters.length - 1; i >= 0; i--) {
+                this.monsters[i].draw();
+            }
+        };
+
+        this.cleared = function() {
+            var allMonsterOffscreen = false;
+            var allMonsterDie = true;
+            for (var i = this.monsters.length - 1; i >= 0; i--) {
+                if (this.monsters[i].y > height) {
+                    allMonsterOffscreen = true;
+                }
+                if (! this.monsters[i].die) {
+                    allMonsterDie = false;
+                }
+            }
+
+            return allMonsterOffscreen || allMonsterDie;
+        };
+    }
+
+    function UI() {
+        this.score = 0;
+        this.draw = function() {
+            fill(255);
+            textSize(32);
+            text("Score " + this.score, 10, 30);
+        };
+
+        this.waveCleared = function() {
+            this.score += 1;
+        };
+
+        this.gameOver = function() {
+            fill(255);
+            textSize(72);
+            text("Game over", 30, height / 2);
+        }
+    }
+
+    setup = function() {
+        this.createCanvas(500, 800);
+        this.player = new Player();
+        this.waves = [];
+        this.ui = new UI();
+        this.waves.push(new Wave(this.ui.score));
+        this.paused = false;
+    };
+
+    draw = function() {
+        background(0);
+
+        this.player.draw();
+        for (var i = this.waves.length - 1; i >= 0; i--) {
+            this.waves[i].draw();
+            if (this.waves[i].cleared()) {
+                this.waves.splice(i, 1);
+                this.ui.waveCleared();
+            }
+        }
+        this.ui.draw();
+
+        if (frameCount % 250 == 0) {
+            this.waves.push(new Wave(this.ui.score));
+        }
+
+        for (var k = this.waves.length - 1; k >= 0; k--) {
+            for (var l = this.waves[k].monsters.length - 1; l >= 0; l--) {
+                for (var j = this.player.bullets.length - 1; j >= 0; j--) {
+                    if (this.player.bullets[j].hit(this.waves[k].monsters[l])) {
+                        this.waves[k].monsters[l].hit(this.player.bullets[j]);
+                        this.player.bullets.splice(j, 1);
+                        break;
+                    }
+
+                    if (this.player.hit(this.waves[k].monsters[l]) || this.paused) {
+                        this.ui.gameOver();
+                        this.paused = true;
+                        noLoop();
+                    }
+                }
+            }
+        }
+
+        this.player.shoot();
+
+//        console.log(this.player.bullets.length);
+
+//        console.log(this.waves.length);
+
+    };
+</script>
+
+</body>
+</html>
